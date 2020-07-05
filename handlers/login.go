@@ -9,9 +9,6 @@ import (
 	"github.com/jpaldi/gognito-auth/auth"
 )
 
-const flowUsernamePassword = "USER_PASSWORD_AUTH"
-const flowRefreshToken = "REFRESH_TOKEN_AUTH"
-
 type LoginHandler struct {
 	Authenticator auth.CognitoAuth
 }
@@ -29,8 +26,8 @@ func (l *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *LoginHandler) post(w http.ResponseWriter, r *http.Request) error {
-	username := r.Form.Get("username")
-	password := r.Form.Get("password")
+	username := "set-me"
+	password := "set-me"
 
 	if len(username) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
@@ -46,29 +43,19 @@ func (l *LoginHandler) post(w http.ResponseWriter, r *http.Request) error {
 
 	r.ParseForm()
 
-	refresh := r.Form.Get("refresh")
-	refreshToken := r.Form.Get("refresh_token")
+	flow := aws.String("ADMIN_NO_SRP_AUTH")
 
-	flow := aws.String(flowUsernamePassword)
-	params := map[string]*string{
-		"USERNAME": aws.String(username),
-		"PASSWORD": aws.String(password),
+	authTry := &cognito.AdminInitiateAuthInput{
+		AuthFlow: flow,
+		AuthParameters: map[string]*string{
+			"USERNAME": aws.String(username),
+			"PASSWORD": aws.String(password),
+		},
+		UserPoolId: aws.String("set-me"),
+		ClientId:   aws.String("set-me"),
 	}
 
-	if refresh != "" {
-		flow = aws.String(flowRefreshToken)
-		params = map[string]*string{
-			"REFRESH_TOKEN": aws.String(refreshToken),
-		}
-	}
-
-	authTry := &cognito.InitiateAuthInput{
-		AuthFlow:       flow,
-		AuthParameters: params,
-		ClientId:       aws.String(l.Authenticator.AppClientID),
-	}
-
-	res, err := l.Authenticator.CognitoClient.InitiateAuth(authTry)
+	res, err := l.Authenticator.CognitoClient.AdminInitiateAuth(authTry)
 	if err != nil {
 		fmt.Println(err)
 		w.WriteHeader(http.StatusAccepted)
