@@ -3,17 +3,21 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	cognito "github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/joho/godotenv"
 	"github.com/jpaldi/gognito-auth/auth"
 	"github.com/jpaldi/gognito-auth/handlers"
 )
 
 func main() {
-	conf := &aws.Config{Region: aws.String("")}
+	godotenv.Load("secrets.env")
+
+	conf := &aws.Config{Region: aws.String(os.Getenv("AWS_REGION"))}
 	sess, err := session.NewSession(conf)
 	if err != nil {
 		panic(fmt.Errorf("connection with aws failed, %w", err))
@@ -21,8 +25,6 @@ func main() {
 
 	auth := auth.CognitoAuth{
 		CognitoClient: cognito.New(sess),
-		UserPoolID:    "",
-		AppClientID:   "",
 	}
 
 	loginHandler := handlers.LoginHandler{

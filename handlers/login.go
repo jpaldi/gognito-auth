@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	cognito "github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
@@ -11,6 +13,17 @@ import (
 
 type LoginHandler struct {
 	Authenticator auth.CognitoAuth
+}
+
+type LoginSuccessfulResponse struct {
+	Session             string
+	ChallengeParameters ChallengeParameters
+}
+
+type ChallengeParameters struct {
+	userAttributes     string
+	USER_ID_FOR_SRP    string
+	requiredAttributes string
 }
 
 func (l *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -26,8 +39,9 @@ func (l *LoginHandler) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *LoginHandler) post(w http.ResponseWriter, r *http.Request) error {
-	username := "set-me"
-	password := "set-me"
+	r.ParseForm()
+	username := r.FormValue("username")
+	password := r.FormValue("password")
 
 	if len(username) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
@@ -41,8 +55,6 @@ func (l *LoginHandler) post(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	r.ParseForm()
-
 	flow := aws.String("ADMIN_NO_SRP_AUTH")
 
 	authTry := &cognito.AdminInitiateAuthInput{
@@ -51,21 +63,27 @@ func (l *LoginHandler) post(w http.ResponseWriter, r *http.Request) error {
 			"USERNAME": aws.String(username),
 			"PASSWORD": aws.String(password),
 		},
-		UserPoolId: aws.String("set-me"),
-		ClientId:   aws.String("set-me"),
+		UserPoolId: aws.String(os.Getenv("AWS_USER_POOL_ID")),
+		ClientId:   aws.String(os.Getenv("AWS_APP_CLIENT_ID")),
 	}
 
 	res, err := l.Authenticator.CognitoClient.AdminInitiateAuth(authTry)
 	if err != nil {
 		fmt.Println(err)
-		w.WriteHeader(http.StatusAccepted)
-		w.Write([]byte(err.Error()))
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("unauthorized"))
 		return nil
 	}
 
-	fmt.Println(res)
+	response, err := json.Marshal(res)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("internal server error"))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	w.Write([]byte("login route"))
+	w.Write(response)
 
 	return nil
 }
